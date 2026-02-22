@@ -486,3 +486,65 @@ This DPI engine demonstrates:
 6. Output verification through Wireshark
 
 The key insight is that TLS metadata (especially ClientHello SNI) enables application-aware traffic control even when payload encryption is used.
+
+---
+
+## 13. Recent Updates (Appended, Original Content Unchanged)
+
+The following updates were added to the Java project after the original document:
+
+- Command wrappers were simplified:
+  - `.\normal.cmd`
+  - `.\block.cmd <rules>`
+  - `.\live.cmd <duration>`
+- Metrics mode can be enabled directly from the same commands:
+  - `.\normal.cmd metrics`
+  - `.\block.cmd youtube,twitter metrics`
+  - `.\live.cmd 45 metrics`
+- Metrics mode behavior:
+  - Starts Prometheus/Grafana automatically (if not running)
+  - Opens Grafana dashboard directly
+  - Runs with `-NoBench` to avoid mixed benchmark output in metrics runs
+- Output organization:
+  - Generated artifacts are directed to `java-port/outputs/` (pcap/csv/json/prom metrics files)
+- Added/updated monitoring stack:
+  - Prometheus + Grafana Docker setup under `java-port/monitoring/`
+  - Provisioned Grafana dashboard for DPI metrics
+- Dashboard currently focuses on:
+  - Processing totals (packets/bytes/tcp/udp/forwarded/dropped)
+  - Performance metrics (pps/throughput/latency/cpu/memory)
+  - Thread statistics (LB/FP)
+  - Application breakdown
+  - Detected domains/SNIs
+
+### Quick Run Commands (Current)
+
+```powershell
+cd "D:\deep packet\Packet_analyzer-main\java-port"
+.\build.cmd
+
+.\normal.cmd
+.\normal.cmd metrics
+
+.\block.cmd youtube,twitter
+.\block.cmd youtube,twitter metrics
+
+.\live.cmd 45
+.\live.cmd 45 metrics
+```
+
+### Monitoring Commands (Current)
+
+```powershell
+cd "D:\deep packet\Packet_analyzer-main\java-port"
+.\monitor.cmd up
+.\monitor.cmd status
+.\monitor.cmd restart
+.\monitor.cmd down
+```
+
+Grafana:
+- `http://localhost:3001/d/dpi-engine-overview/dpi-live-metrics-report`
+
+Prometheus:
+- `http://localhost:9090`

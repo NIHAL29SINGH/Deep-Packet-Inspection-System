@@ -1,0 +1,23 @@
+param(
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$Args
+)
+
+$inputPcap = $null
+$extraArgs = @()
+$noBench = $false
+$enableMetrics = $false
+
+if ($Args -and $Args.Count -gt 0) {
+    foreach ($arg in $Args) {
+        if ([string]::Equals($arg, "metrics", [System.StringComparison]::OrdinalIgnoreCase) -or
+            [string]::Equals($arg, "-metrics", [System.StringComparison]::OrdinalIgnoreCase)) {
+            $enableMetrics = $true
+            continue
+        }
+        if ([string]::Equals($arg, "-NoBench", [System.StringComparison]::OrdinalIgnoreCase)) {
+            $noBench = $true
+            continue
+        }
+    }
+}

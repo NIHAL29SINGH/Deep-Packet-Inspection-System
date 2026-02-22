@@ -3,7 +3,10 @@ param(
     [string]$BaseName = "report",
 
     [Parameter(Position=1)]
-    [string]$InputPcap = ""
+    [string]$InputPcap = "",
+
+    [switch]$NoBench,
+    [switch]$Monitor
 )
 
 $projectRoot = Split-Path $PSScriptRoot -Parent
@@ -31,11 +34,11 @@ if ([string]::IsNullOrWhiteSpace($InputPcap)) {
     if (Test-Path $candidateAbs) {
         $InputPcap = $candidateRel
     } else {
-        $InputPcap = "..\test_dpi.pcap"
+        $InputPcap = "..\quick_test_mixed_20mb.pcap"
     }
 }
 
-& "$PSScriptRoot\dpi.ps1" report -InputPcap $InputPcap -OutputPcap $outputPcap -ReportCsv $reportCsv -ReportJson $reportJson @args
+& "$PSScriptRoot\dpi.ps1" report -InputPcap $InputPcap -OutputPcap $outputPcap -ReportCsv $reportCsv -ReportJson $reportJson -NoBench:$NoBench -Monitor:$Monitor @args
 
 if ($LASTEXITCODE -eq 0) {
     $csvAbs = Join-Path $projectRoot $reportCsv

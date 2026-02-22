@@ -12,4 +12,5 @@ public class PacketJob {
     public int tcpFlags;
     public int tsSec;
     public int tsUsec;
+    public long enqueueNanos;
 }

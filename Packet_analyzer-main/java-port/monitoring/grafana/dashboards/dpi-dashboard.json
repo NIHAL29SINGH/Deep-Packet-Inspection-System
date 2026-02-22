@@ -1,0 +1,642 @@
+{
+    "annotations":  {
+                        "list":  [
+
+                                 ]
+                    },
+    "editable":  true,
+    "graphTooltip":  0,
+    "id":  null,
+    "links":  [
+
+              ],
+    "panels":  [
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "none"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  6,
+                                       "w":  6,
+                                       "x":  0,
+                                       "y":  0
+                                   },
+                       "id":  1,
+                       "options":  {
+                                       "reduceOptions":  {
+                                                             "calcs":  [
+                                                                           "lastNotNull"
+                                                                       ],
+                                                             "fields":  "",
+                                                             "values":  false
+                                                         },
+                                       "orientation":  "auto",
+                                       "textMode":  "value"
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "dpi_processing_total_packets",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "Total Packets",
+                       "type":  "stat"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "bytes"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  6,
+                                       "w":  6,
+                                       "x":  6,
+                                       "y":  0
+                                   },
+                       "id":  2,
+                       "options":  {
+                                       "reduceOptions":  {
+                                                             "calcs":  [
+                                                                           "lastNotNull"
+                                                                       ],
+                                                             "fields":  "",
+                                                             "values":  false
+                                                         },
+                                       "orientation":  "auto",
+                                       "textMode":  "value"
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "dpi_processing_total_bytes",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "Total Bytes",
+                       "type":  "stat"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "pps"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  6,
+                                       "w":  6,
+                                       "x":  12,
+                                       "y":  0
+                                   },
+                       "id":  3,
+                       "options":  {
+                                       "reduceOptions":  {
+                                                             "calcs":  [
+                                                                           "lastNotNull"
+                                                                       ],
+                                                             "fields":  "",
+                                                             "values":  false
+                                                         },
+                                       "orientation":  "auto",
+                                       "textMode":  "value"
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "dpi_performance_packets_per_second",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "Packets Per Second",
+                       "type":  "stat"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "bps"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  6,
+                                       "w":  6,
+                                       "x":  18,
+                                       "y":  0
+                                   },
+                       "id":  4,
+                       "options":  {
+                                       "reduceOptions":  {
+                                                             "calcs":  [
+                                                                           "lastNotNull"
+                                                                       ],
+                                                             "fields":  "",
+                                                             "values":  false
+                                                         },
+                                       "orientation":  "auto",
+                                       "textMode":  "value"
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "dpi_performance_throughput_bps",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "Throughput",
+                       "type":  "stat"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "none"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  6,
+                                       "w":  6,
+                                       "x":  0,
+                                       "y":  6
+                                   },
+                       "id":  11,
+                       "options":  {
+                                       "reduceOptions":  {
+                                                             "calcs":  [
+                                                                           "lastNotNull"
+                                                                       ],
+                                                             "fields":  "",
+                                                             "values":  false
+                                                         },
+                                       "orientation":  "auto",
+                                       "textMode":  "value"
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "dpi_processing_tcp_packets",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "TCP Packets",
+                       "type":  "stat"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "none"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  6,
+                                       "w":  6,
+                                       "x":  6,
+                                       "y":  6
+                                   },
+                       "id":  12,
+                       "options":  {
+                                       "reduceOptions":  {
+                                                             "calcs":  [
+                                                                           "lastNotNull"
+                                                                       ],
+                                                             "fields":  "",
+                                                             "values":  false
+                                                         },
+                                       "orientation":  "auto",
+                                       "textMode":  "value"
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "dpi_processing_udp_packets",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "UDP Packets",
+                       "type":  "stat"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "none"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  6,
+                                       "w":  6,
+                                       "x":  12,
+                                       "y":  6
+                                   },
+                       "id":  13,
+                       "options":  {
+                                       "reduceOptions":  {
+                                                             "calcs":  [
+                                                                           "lastNotNull"
+                                                                       ],
+                                                             "fields":  "",
+                                                             "values":  false
+                                                         },
+                                       "orientation":  "auto",
+                                       "textMode":  "value"
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "dpi_processing_forwarded_packets",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "Forwarded",
+                       "type":  "stat"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "none"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  6,
+                                       "w":  6,
+                                       "x":  18,
+                                       "y":  6
+                                   },
+                       "id":  14,
+                       "options":  {
+                                       "reduceOptions":  {
+                                                             "calcs":  [
+                                                                           "lastNotNull"
+                                                                       ],
+                                                             "fields":  "",
+                                                             "values":  false
+                                                         },
+                                       "orientation":  "auto",
+                                       "textMode":  "value"
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "dpi_processing_dropped_packets",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "Dropped",
+                       "type":  "stat"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "percent"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  7,
+                                       "w":  8,
+                                       "x":  0,
+                                       "y":  12
+                                   },
+                       "id":  5,
+                       "options":  {
+                                       "legend":  {
+                                                      "displayMode":  "list",
+                                                      "placement":  "bottom"
+                                                  }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "dpi_performance_cpu_avg_percent",
+                                           "legendFormat":  "CPU avg %",
+                                           "refId":  "A"
+                                       },
+                                       {
+                                           "expr":  "dpi_performance_cpu_system_end_percent",
+                                           "legendFormat":  "System CPU end %",
+                                           "refId":  "B"
+                                       }
+                                   ],
+                       "title":  "CPU",
+                       "type":  "timeseries"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "decmbytes"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  7,
+                                       "w":  8,
+                                       "x":  8,
+                                       "y":  12
+                                   },
+                       "id":  6,
+                       "options":  {
+                                       "legend":  {
+                                                      "displayMode":  "list",
+                                                      "placement":  "bottom"
+                                                  }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "dpi_performance_memory_before_mb",
+                                           "legendFormat":  "Memory before MB",
+                                           "refId":  "A"
+                                       },
+                                       {
+                                           "expr":  "dpi_performance_memory_after_mb",
+                                           "legendFormat":  "Memory after MB",
+                                           "refId":  "B"
+                                       },
+                                       {
+                                           "expr":  "dpi_performance_memory_peak_mb",
+                                           "legendFormat":  "Memory peak MB",
+                                           "refId":  "C"
+                                       }
+                                   ],
+                       "title":  "Memory",
+                       "type":  "timeseries"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "micros"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  7,
+                                       "w":  8,
+                                       "x":  16,
+                                       "y":  12
+                                   },
+                       "id":  7,
+                       "options":  {
+                                       "legend":  {
+                                                      "displayMode":  "list",
+                                                      "placement":  "bottom"
+                                                  }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "dpi_performance_latency_avg_us",
+                                           "legendFormat":  "Avg us",
+                                           "refId":  "A"
+                                       },
+                                       {
+                                           "expr":  "dpi_performance_latency_p95_us",
+                                           "legendFormat":  "P95 us",
+                                           "refId":  "B"
+                                       },
+                                       {
+                                           "expr":  "dpi_performance_latency_min_us",
+                                           "legendFormat":  "Min us",
+                                           "refId":  "D"
+                                       },
+                                       {
+                                           "expr":  "dpi_performance_latency_max_us",
+                                           "legendFormat":  "Max us",
+                                           "refId":  "C"
+                                       }
+                                   ],
+                       "title":  "Latency",
+                       "type":  "timeseries"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "none"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  8,
+                                       "w":  12,
+                                       "x":  0,
+                                       "y":  19
+                                   },
+                       "id":  8,
+                       "options":  {
+                                       "legend":  {
+                                                      "displayMode":  "table",
+                                                      "placement":  "bottom"
+                                                  }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "dpi_thread_lb_dispatched",
+                                           "legendFormat":  "LB {{lb}}",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "LB Dispatch",
+                       "type":  "timeseries"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "none"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  8,
+                                       "w":  12,
+                                       "x":  12,
+                                       "y":  19
+                                   },
+                       "id":  9,
+                       "options":  {
+                                       "legend":  {
+                                                      "displayMode":  "table",
+                                                      "placement":  "bottom"
+                                                  }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "dpi_thread_fp_processed",
+                                           "legendFormat":  "FP {{fp}}",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "FP Processed",
+                       "type":  "timeseries"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "none"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  10,
+                                       "w":  24,
+                                       "x":  0,
+                                       "y":  27
+                                   },
+                       "id":  10,
+                       "options":  {
+                                       "legend":  {
+                                                      "displayMode":  "table",
+                                                      "placement":  "right"
+                                                  }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "topk(15, dpi_application_count)",
+                                           "legendFormat":  "{{app}}",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "Application Breakdown",
+                       "type":  "timeseries"
+                   },
+                   {
+                       "datasource":  {
+                                          "type":  "prometheus",
+                                          "uid":  "prometheus"
+                                      },
+                       "fieldConfig":  {
+                                           "defaults":  {
+                                                            "unit":  "none"
+                                                        },
+                                           "overrides":  [
+
+                                                         ]
+                                       },
+                       "gridPos":  {
+                                       "h":  8,
+                                       "w":  12,
+                                       "x":  12,
+                                       "y":  37
+                                   },
+                       "id":  16,
+                       "options":  {
+                                       "legend":  {
+                                                      "displayMode":  "table",
+                                                      "placement":  "right"
+                                                  }
+                                   },
+                       "targets":  [
+                                       {
+                                           "expr":  "topk(20, dpi_domain_count)",
+                                           "legendFormat":  "{{domain}}",
+                                           "refId":  "A"
+                                       }
+                                   ],
+                       "title":  "Detected Domains/SNIs",
+                       "type":  "timeseries"
+                   }
+               ],
+    "refresh":  "2s",
+    "schemaVersion":  39,
+    "style":  "dark",
+    "tags":  [
+                 "dpi",
+                 "prometheus"
+             ],
+    "templating":  {
+                       "list":  [
+
+                                ]
+                   },
+    "time":  {
+                 "from":  "now-15m",
+                 "to":  "now"
+             },
+    "timepicker":  {
+
+                   },
+    "timezone":  "",
+    "title":  "DPI Live Metrics Report",
+    "uid":  "dpi-engine-overview",
+    "version":  2,
+    "weekStart":  ""
+}
+

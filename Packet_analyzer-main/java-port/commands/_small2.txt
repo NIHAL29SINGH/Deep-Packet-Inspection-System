@@ -1,0 +1,2 @@
+& "$PSScriptRoot\monitor.cmd" up | Out-Null
+Start-Process "http://localhost:3001"

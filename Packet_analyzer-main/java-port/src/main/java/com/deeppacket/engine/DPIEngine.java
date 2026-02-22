@@ -1,11 +1,13 @@
 package com.deeppacket.engine;
 
+import com.sun.management.OperatingSystemMXBean;
 import com.deeppacket.model.AppType;
 import com.deeppacket.model.DPIStats;
 import com.deeppacket.model.FiveTuple;
 import com.deeppacket.model.PacketAction;
 import com.deeppacket.model.PacketJob;
 import com.deeppacket.model.NetUtil;
+import com.deeppacket.monitoring.PrometheusMetrics;
 import com.deeppacket.parser.PacketParser;
 import com.deeppacket.parser.ParsedPacket;
 import com.deeppacket.pcap.PcapPacketHeader;
@@ -15,15 +17,20 @@ import com.deeppacket.pcap.PcapWriter;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryPoolMXBean;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class DPIEngine {
     public static class Config {
@@ -44,6 +51,63 @@ public class DPIEngine {
     private GlobalConnectionTable globalTable;
     private PcapWriter writer;
     private Thread outputThread;
+    private final LatencyTracker latencyTracker = new LatencyTracker();
+    private final PerfSnapshot perf = new PerfSnapshot();
+    private final Runtime runtime = Runtime.getRuntime();
+    private final int availableProcessors = runtime.availableProcessors();
+    private final OperatingSystemMXBean osBean = resolveOsBean();
+
+    private static final class PerfSnapshot {
+        long startNanos;
+        long endNanos;
+        long startCpuNanos;
+        long endCpuNanos;
+        double endSystemCpuLoad = -1.0;
+        long usedMemBefore;
+        long usedMemAfter;
+        long peakMemBytes;
+    }
+
+    private static final class LatencyTracker {
+        private final AtomicLong count = new AtomicLong();
+        private final AtomicLong totalNanos = new AtomicLong();
+        private final AtomicLong minNanos = new AtomicLong(Long.MAX_VALUE);
+        private final AtomicLong maxNanos = new AtomicLong();
+        private long[] samples = new long[2048];
+        private int size = 0;
+
+        void record(long nanos) {
+            if (nanos < 0) return;
+            count.incrementAndGet();
+            totalNanos.addAndGet(nanos);
+            minNanos.accumulateAndGet(nanos, Math::min);
+            maxNanos.accumulateAndGet(nanos, Math::max);
+            synchronized (this) {
+                if (size == samples.length) {
+                    samples = Arrays.copyOf(samples, samples.length * 2);
+                }
+                samples[size++] = nanos;
+            }
+        }
+
+        long count() { return count.get(); }
+        long totalNanos() { return totalNanos.get(); }
+        long minNanos() { return count.get() == 0 ? 0 : minNanos.get(); }
+        long maxNanos() { return maxNanos.get(); }
+
+        long percentileNanos(double percentile) {
+            if (count.get() == 0) return 0;
+            long[] copy;
+            synchronized (this) {
+                copy = Arrays.copyOf(samples, size);
+            }
+            Arrays.sort(copy);
+            int index = (int) Math.ceil((percentile / 100.0) * copy.length) - 1;
+            if (index < 0) index = 0;
+            if (index >= copy.length) index = copy.length - 1;
+            return copy[index];
+        }
+    }
 
     public DPIEngine(Config config) {
         this.config = config;
@@ -74,6 +138,7 @@ public class DPIEngine {
     public boolean processFile(String inputFile, String outputFile) {
         if (ruleManager == null && !initialize()) return false;
 
+        startPerfCapture();
         try (PcapReader reader = new PcapReader()) {
             reader.open(inputFile);
             writer = new PcapWriter();
@@ -103,10 +168,14 @@ public class DPIEngine {
             Thread.sleep(700);
             stop();
             writer.close();
+            endPerfCapture();
+            publishPrometheusMetrics();
             return true;
         } catch (Exception e) {
             System.err.println("[DPIEngine] Failed to process file: " + e.getMessage());
             stop();
+            endPerfCapture();
+            publishPrometheusMetrics();
             return false;
         }
     }
@@ -171,6 +240,17 @@ public class DPIEngine {
             if (topConnections.size() > 20) topConnections = topConnections.subList(0, 20);
 
             StringBuilder sb = new StringBuilder();
+            long durationNanos = Math.max(1, perf.endNanos - perf.startNanos);
+            double durationSec = durationNanos / 1_000_000_000.0;
+            double pps = stats.totalPackets.get() / durationSec;
+            double throughputBps = (stats.totalBytes.get() * 8.0) / durationSec;
+            long latencyCount = latencyTracker.count();
+            double avgLatencyNs = latencyCount == 0 ? 0.0 : (latencyTracker.totalNanos() / (double) latencyCount);
+            double avgCpuUsage = 0.0;
+            if (availableProcessors > 0 && perf.endCpuNanos >= perf.startCpuNanos) {
+                avgCpuUsage = 100.0 * (perf.endCpuNanos - perf.startCpuNanos) / (durationNanos * availableProcessors);
+            }
+
             sb.append("{\n");
             sb.append("  \"stats\": {\n");
             sb.append("    \"total_packets\": ").append(stats.totalPackets.get()).append(",\n");
@@ -181,6 +261,21 @@ public class DPIEngine {
             sb.append("    \"dropped_packets\": ").append(stats.droppedPackets.get()).append(",\n");
             sb.append("    \"active_connections\": ").append(g.totalActiveConnections()).append(",\n");
             sb.append("    \"connections_seen\": ").append(g.totalConnectionsSeen()).append("\n");
+            sb.append("  },\n");
+            sb.append("  \"performance\": {\n");
+            sb.append("    \"processing_time_sec\": ").append(String.format(java.util.Locale.US, "%.6f", durationSec)).append(",\n");
+            sb.append("    \"packets_per_second\": ").append(String.format(java.util.Locale.US, "%.2f", pps)).append(",\n");
+            sb.append("    \"throughput_bps\": ").append(String.format(java.util.Locale.US, "%.2f", throughputBps)).append(",\n");
+            sb.append("    \"avg_latency_us\": ").append(String.format(java.util.Locale.US, "%.3f", avgLatencyNs / 1_000.0)).append(",\n");
+            sb.append("    \"min_latency_us\": ").append(String.format(java.util.Locale.US, "%.3f", latencyTracker.minNanos() / 1_000.0)).append(",\n");
+            sb.append("    \"max_latency_us\": ").append(String.format(java.util.Locale.US, "%.3f", latencyTracker.maxNanos() / 1_000.0)).append(",\n");
+            sb.append("    \"p95_latency_us\": ").append(String.format(java.util.Locale.US, "%.3f", latencyTracker.percentileNanos(95.0) / 1_000.0)).append(",\n");
+            sb.append("    \"cpu_cores\": ").append(availableProcessors).append(",\n");
+            sb.append("    \"avg_cpu_usage_percent\": ").append(String.format(java.util.Locale.US, "%.2f", Math.max(0.0, avgCpuUsage))).append(",\n");
+            sb.append("    \"system_cpu_load_end_percent\": ").append(perf.endSystemCpuLoad >= 0.0 ? String.format(java.util.Locale.US, "%.2f", perf.endSystemCpuLoad * 100.0) : "null").append(",\n");
+            sb.append("    \"memory_before_mb\": ").append(String.format(java.util.Locale.US, "%.2f", perf.usedMemBefore / (1024.0 * 1024.0))).append(",\n");
+            sb.append("    \"memory_after_mb\": ").append(String.format(java.util.Locale.US, "%.2f", perf.usedMemAfter / (1024.0 * 1024.0))).append(",\n");
+            sb.append("    \"peak_memory_mb\": ").append(String.format(java.util.Locale.US, "%.2f", perf.peakMemBytes / (1024.0 * 1024.0))).append("\n");
             sb.append("  },\n");
 
             sb.append("  \"app_distribution\": [\n");
@@ -287,6 +382,7 @@ public class DPIEngine {
             }
         }
 
+        appendPerformanceReport(sb);
         sb.append("==============================================================\n");
         return sb.toString();
     }
@@ -326,6 +422,7 @@ public class DPIEngine {
     }
 
     private void handleOutput(PacketJob job, PacketAction action) {
+        latencyTracker.record(System.nanoTime() - job.enqueueNanos);
         if (action == PacketAction.DROP) {
             stats.droppedPackets.incrementAndGet();
             return;
@@ -339,6 +436,7 @@ public class DPIEngine {
         job.packetId = packetId;
         job.tsSec = tsSec;
         job.tsUsec = tsUsec;
+        job.enqueueNanos = System.nanoTime();
         job.data = data;
         job.ethOffset = 0;
         job.ipOffset = 14;
@@ -353,6 +451,190 @@ public class DPIEngine {
             parsed.protocol
         );
         return job;
+    }
+
+    private static OperatingSystemMXBean resolveOsBean() {
+        var bean = ManagementFactory.getOperatingSystemMXBean();
+        if (bean instanceof OperatingSystemMXBean os) return os;
+        return null;
+    }
+
+    private void startPerfCapture() {
+        perf.startNanos = System.nanoTime();
+        perf.startCpuNanos = osBean != null ? osBean.getProcessCpuTime() : 0;
+        perf.usedMemBefore = usedMemoryBytes();
+        perf.usedMemAfter = perf.usedMemBefore;
+        perf.endCpuNanos = perf.startCpuNanos;
+        perf.endNanos = perf.startNanos;
+        perf.endSystemCpuLoad = -1.0;
+        resetPeakMemoryMeters();
+    }
+
+    private void endPerfCapture() {
+        perf.endNanos = System.nanoTime();
+        perf.endCpuNanos = osBean != null ? osBean.getProcessCpuTime() : perf.startCpuNanos;
+        perf.endSystemCpuLoad = osBean != null ? osBean.getSystemCpuLoad() : -1.0;
+        perf.usedMemAfter = usedMemoryBytes();
+        perf.peakMemBytes = peakMemoryBytes();
+    }
+
+    private void appendPerformanceReport(StringBuilder sb) {
+        long packets = stats.totalPackets.get();
+        long totalBytes = stats.totalBytes.get();
+        long durationNanos = Math.max(1, perf.endNanos - perf.startNanos);
+        double durationSec = durationNanos / 1_000_000_000.0;
+        double pps = packets / durationSec;
+        double throughputBps = (totalBytes * 8.0) / durationSec;
+
+        long latencyCount = latencyTracker.count();
+        double avgLatencyNs = latencyCount == 0 ? 0.0 : (latencyTracker.totalNanos() / (double) latencyCount);
+        double minLatencyNs = latencyTracker.minNanos();
+        double maxLatencyNs = latencyTracker.maxNanos();
+        double p95LatencyNs = latencyTracker.percentileNanos(95.0);
+
+        double avgCpuUsage = 0.0;
+        if (availableProcessors > 0 && perf.endCpuNanos >= perf.startCpuNanos) {
+            avgCpuUsage = 100.0 * (perf.endCpuNanos - perf.startCpuNanos) / (durationNanos * availableProcessors);
+        }
+
+        sb.append("==============================================================\n");
+        sb.append(" PERFORMANCE REPORT\n");
+        sb.append("--------------------------------------------------------------\n");
+        sb.append(String.format(" Packets Processed : %d%n", packets));
+        sb.append(String.format(" Total Bytes       : %d (%.2f MB)%n", totalBytes, totalBytes / (1024.0 * 1024.0)));
+        sb.append(String.format(" Processing Time   : %.3f sec%n", durationSec));
+        sb.append(String.format(" Packets Per Second: %,.0f pps%n", pps));
+        sb.append(String.format(" Throughput        : %s%n", formatBitrate(throughputBps)));
+        sb.append(String.format(" Avg Latency       : %.2f us%n", avgLatencyNs / 1_000.0));
+        sb.append(String.format(" Min Latency       : %.2f us%n", minLatencyNs / 1_000.0));
+        sb.append(String.format(" Max Latency       : %.2f us%n", maxLatencyNs / 1_000.0));
+        sb.append(String.format(" P95 Latency       : %.2f us%n", p95LatencyNs / 1_000.0));
+        sb.append(String.format(" CPU Cores         : %d%n", availableProcessors));
+        sb.append(String.format(" Avg CPU Usage     : %.1f%%%n", Math.max(0.0, avgCpuUsage)));
+        if (perf.endSystemCpuLoad >= 0.0) {
+            sb.append(String.format(" System CPU (end)  : %.1f%%%n", perf.endSystemCpuLoad * 100.0));
+        } else {
+            sb.append(" System CPU (end)  : n/a\n");
+        }
+        sb.append(String.format(" Memory Before     : %.2f MB%n", perf.usedMemBefore / (1024.0 * 1024.0)));
+        sb.append(String.format(" Memory After      : %.2f MB%n", perf.usedMemAfter / (1024.0 * 1024.0)));
+        sb.append(String.format(" Peak Memory       : %.2f MB%n", perf.peakMemBytes / (1024.0 * 1024.0)));
+    }
+
+    private void publishPrometheusMetrics() {
+        PrometheusMetrics pm = PrometheusMetrics.getInstance();
+
+        long packets = stats.totalPackets.get();
+        long totalBytes = stats.totalBytes.get();
+        long durationNanos = Math.max(1, perf.endNanos - perf.startNanos);
+        double durationSec = durationNanos / 1_000_000_000.0;
+        double pps = packets / durationSec;
+        double throughputBps = (totalBytes * 8.0) / durationSec;
+
+        long latencyCount = latencyTracker.count();
+        double avgLatencyNs = latencyCount == 0 ? 0.0 : (latencyTracker.totalNanos() / (double) latencyCount);
+        double avgCpuUsage = 0.0;
+        if (availableProcessors > 0 && perf.endCpuNanos >= perf.startCpuNanos) {
+            avgCpuUsage = 100.0 * (perf.endCpuNanos - perf.startCpuNanos) / (durationNanos * availableProcessors);
+        }
+
+        pm.setGauge("dpi_processing_total_packets", packets);
+        pm.setGauge("dpi_processing_total_bytes", totalBytes);
+        pm.setGauge("dpi_processing_tcp_packets", stats.tcpPackets.get());
+        pm.setGauge("dpi_processing_udp_packets", stats.udpPackets.get());
+        pm.setGauge("dpi_processing_forwarded_packets", stats.forwardedPackets.get());
+        pm.setGauge("dpi_processing_dropped_packets", stats.droppedPackets.get());
+
+        pm.setGauge("dpi_performance_processing_seconds", durationSec);
+        pm.setGauge("dpi_performance_packets_per_second", pps);
+        pm.setGauge("dpi_performance_throughput_bps", throughputBps);
+        pm.setGauge("dpi_performance_latency_avg_us", avgLatencyNs / 1_000.0);
+        pm.setGauge("dpi_performance_latency_min_us", latencyTracker.minNanos() / 1_000.0);
+        pm.setGauge("dpi_performance_latency_max_us", latencyTracker.maxNanos() / 1_000.0);
+        pm.setGauge("dpi_performance_latency_p95_us", latencyTracker.percentileNanos(95.0) / 1_000.0);
+        pm.setGauge("dpi_performance_cpu_cores", availableProcessors);
+        pm.setGauge("dpi_performance_cpu_avg_percent", Math.max(0.0, avgCpuUsage));
+        if (perf.endSystemCpuLoad >= 0.0) {
+            pm.setGauge("dpi_performance_cpu_system_end_percent", perf.endSystemCpuLoad * 100.0);
+        } else {
+            pm.clearGauge("dpi_performance_cpu_system_end_percent");
+        }
+        pm.setGauge("dpi_performance_memory_before_mb", perf.usedMemBefore / (1024.0 * 1024.0));
+        pm.setGauge("dpi_performance_memory_after_mb", perf.usedMemAfter / (1024.0 * 1024.0));
+        pm.setGauge("dpi_performance_memory_peak_mb", perf.peakMemBytes / (1024.0 * 1024.0));
+
+        pm.clearLabeledMetric("dpi_thread_lb_dispatched");
+        if (lbManager != null) {
+            for (int i = 0; i < lbManager.getNumLBs(); i++) {
+                Map<String, String> labels = new HashMap<>();
+                labels.put("lb", Integer.toString(i));
+                pm.setLabeledGauge("dpi_thread_lb_dispatched", labels, lbManager.getLB(i).getStats().packetsDispatched());
+            }
+        }
+
+        pm.clearLabeledMetric("dpi_thread_fp_processed");
+        if (fpManager != null) {
+            for (int i = 0; i < fpManager.getNumFPs(); i++) {
+                Map<String, String> labels = new HashMap<>();
+                labels.put("fp", Integer.toString(i));
+                pm.setLabeledGauge("dpi_thread_fp_processed", labels, fpManager.getFP(i).getStats().packetsProcessed());
+            }
+        }
+
+        pm.clearLabeledMetric("dpi_application_count");
+        pm.clearLabeledMetric("dpi_domain_count");
+        if (globalTable != null) {
+            var g = globalTable.getGlobalStats();
+            pm.setGauge("dpi_connections_active", g.totalActiveConnections());
+            pm.setGauge("dpi_connections_seen", g.totalConnectionsSeen());
+
+            for (Map.Entry<AppType, Long> e : g.appDistribution().entrySet()) {
+                Map<String, String> labels = new HashMap<>();
+                labels.put("app", e.getKey().displayName());
+                pm.setLabeledGauge("dpi_application_count", labels, e.getValue());
+            }
+
+            for (Map.Entry<String, Long> e : g.topDomains()) {
+                Map<String, String> labels = new HashMap<>();
+                labels.put("domain", e.getKey());
+                labels.put("app", AppType.fromSni(e.getKey()).displayName());
+                pm.setLabeledGauge("dpi_domain_count", labels, e.getValue());
+            }
+        }
+    }
+
+    private long usedMemoryBytes() {
+        return runtime.totalMemory() - runtime.freeMemory();
+    }
+
+    private static void resetPeakMemoryMeters() {
+        for (MemoryPoolMXBean pool : ManagementFactory.getMemoryPoolMXBeans()) {
+            try {
+                pool.resetPeakUsage();
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    private static long peakMemoryBytes() {
+        long peak = 0;
+        for (MemoryPoolMXBean pool : ManagementFactory.getMemoryPoolMXBeans()) {
+            try {
+                var usage = pool.getPeakUsage();
+                if (usage != null && usage.getUsed() > 0) {
+                    peak += usage.getUsed();
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return peak;
+    }
+
+    private static String formatBitrate(double bps) {
+        if (bps >= 1_000_000_000.0) return String.format("%.2f Gbps", bps / 1_000_000_000.0);
+        if (bps >= 1_000_000.0) return String.format("%.2f Mbps", bps / 1_000_000.0);
+        if (bps >= 1_000.0) return String.format("%.2f Kbps", bps / 1_000.0);
+        return String.format("%.0f bps", bps);
     }
 
     private static String protocolName(int protocol) {

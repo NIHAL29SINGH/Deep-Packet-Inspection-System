@@ -1,0 +1,1 @@
+& powershell -ExecutionPolicy Bypass -File "$PSScriptRoot\dpi.ps1" @forward

@@ -2,7 +2,10 @@ package com.deeppacket.app;
 
 import com.deeppacket.engine.DPIEngine;
 import com.deeppacket.engine.LiveCaptureService;
+import com.deeppacket.monitoring.PrometheusMetrics;
+import com.deeppacket.monitoring.PrometheusMetricsServer;
 
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -28,6 +31,11 @@ public class DpiMain {
               --duration <sec>
               --capture-out <input_live.pcap>
               --bpf <filter>
+              --no-metrics
+              --metrics-bind <addr>
+              --metrics-port <port>
+              --metrics-hold <sec>
+              --metrics-file <file>
               --list-ifaces
               --help, -h
 
@@ -37,8 +45,9 @@ public class DpiMain {
               %s ../test_dpi.pcap ../output.pcap --report-csv ../report.csv
               %s ../test_dpi.pcap ../output.pcap --report-csv ../report.csv --report-json ../report.json
               %s ../test_dpi.pcap ../output.pcap --rules rules.txt --save-rules rules_out.txt
+              %s ../test_dpi.pcap ../output.pcap --metrics-port 9400 --metrics-hold 30
               %s --live ../output_live_filtered.pcap --iface Ethernet --duration 20 --capture-out ../live_input.pcap
-            """.formatted(program, program, program, program, program, program, program, program));
+            """.formatted(program, program, program, program, program, program, program, program, program));
     }
 
     public static void main(String[] args) {
@@ -68,7 +77,12 @@ public class DpiMain {
         String iface = "";
         int durationSec = 15;
         String captureOut = "../live_capture_input.pcap";
-        String bpf = "";
+        String bpf = "ip and tcp or ip and udp";
+        boolean metricsEnabled = true;
+        String metricsBind = "0.0.0.0";
+        int metricsPort = 9400;
+        int metricsHoldSec = 0;
+        String metricsFile = "./outputs/prometheus_metrics.prom";
 
         if (liveMode) {
             if (args.length < 2) {
@@ -110,6 +124,11 @@ public class DpiMain {
             else if ("--duration".equals(arg) && i + 1 < args.length) durationSec = Integer.parseInt(args[++i]);
             else if ("--capture-out".equals(arg) && i + 1 < args.length) captureOut = args[++i];
             else if ("--bpf".equals(arg) && i + 1 < args.length) bpf = args[++i];
+            else if ("--no-metrics".equals(arg)) metricsEnabled = false;
+            else if ("--metrics-bind".equals(arg) && i + 1 < args.length) metricsBind = args[++i];
+            else if ("--metrics-port".equals(arg) && i + 1 < args.length) metricsPort = Integer.parseInt(args[++i]);
+            else if ("--metrics-hold".equals(arg) && i + 1 < args.length) metricsHoldSec = Integer.parseInt(args[++i]);
+            else if ("--metrics-file".equals(arg) && i + 1 < args.length) metricsFile = args[++i];
             else if ("--block-ip".equals(arg) && i + 1 < args.length) blockIps.add(args[++i]);
             else if ("--block-app".equals(arg) && i + 1 < args.length) blockApps.add(args[++i]);
             else if ("--block-domain".equals(arg) && i + 1 < args.length) blockDomains.add(args[++i]);
@@ -132,6 +151,14 @@ public class DpiMain {
         }
         if (durationSec <= 0) {
             System.err.println("Error: --duration must be positive.");
+            System.exit(1);
+        }
+        if (metricsPort <= 0 || metricsPort > 65535) {
+            System.err.println("Error: --metrics-port must be in range 1..65535.");
+            System.exit(1);
+        }
+        if (metricsHoldSec < 0) {
+            System.err.println("Error: --metrics-hold must be >= 0.");
             System.exit(1);
         }
 
@@ -163,8 +190,26 @@ public class DpiMain {
         }
         for (String domain : blockDomains) engine.blockDomain(domain);
 
+        PrometheusMetricsServer metricsServer = null;
+        if (metricsEnabled) {
+            metricsServer = new PrometheusMetricsServer();
+            if (metricsServer.start(metricsBind, metricsPort)) {
+                System.out.println("[Metrics] Prometheus endpoint: http://" + metricsBind + ":" + metricsPort + "/metrics");
+            } else {
+                System.err.println("[Metrics] Failed to start metrics endpoint on " + metricsBind + ":" + metricsPort);
+            }
+        }
+
         boolean ok = engine.processFile(input, output);
         System.out.println(engine.generateReport());
+
+        if (metricsEnabled && !metricsFile.isEmpty()) {
+            if (PrometheusMetrics.getInstance().writeToFile(Paths.get(metricsFile))) {
+                System.out.println("[Metrics] Prometheus file: " + metricsFile);
+            } else {
+                System.err.println("[Metrics] Failed to write metrics file: " + metricsFile);
+            }
+        }
         if (!saveRulesFile.isEmpty()) {
             if (!engine.saveRules(saveRulesFile)) {
                 System.err.println("Failed to save rules to: " + saveRulesFile);
@@ -185,6 +230,17 @@ public class DpiMain {
                 System.exit(1);
             }
             System.out.println("JSON report written to: " + reportJsonFile);
+        }
+        if (metricsEnabled && metricsHoldSec > 0) {
+            System.out.println("[Metrics] Holding for " + metricsHoldSec + "s for scraping...");
+            try {
+                Thread.sleep(metricsHoldSec * 1000L);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        if (metricsServer != null) {
+            metricsServer.stop();
         }
         if (!ok) System.exit(1);
         System.out.println("Output written to: " + output);

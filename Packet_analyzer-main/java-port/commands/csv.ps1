@@ -3,7 +3,10 @@ param(
     [string]$ReportCsv = ".\outputs\report.csv",
 
     [Parameter(Position=1)]
-    [string]$InputPcap = ""
+    [string]$InputPcap = "",
+
+    [switch]$NoBench,
+    [switch]$Monitor
 )
 
 $projectRoot = Split-Path $PSScriptRoot -Parent
@@ -44,7 +47,7 @@ if ([string]::IsNullOrWhiteSpace($InputPcap)) {
     if (Test-Path $candidateAbs) {
         $InputPcap = $candidateRel
     } else {
-        $InputPcap = "..\test_dpi.pcap"
+        $InputPcap = "..\quick_test_mixed_20mb.pcap"
     }
 }
 
@@ -68,7 +71,7 @@ if (-not (Test-IsPcapFile $inputAbs)) {
     exit 1
 }
 
-& "$PSScriptRoot\dpi.ps1" csv -InputPcap $InputPcap -ReportCsv $ReportCsv
+& "$PSScriptRoot\dpi.ps1" csv -InputPcap $InputPcap -ReportCsv $ReportCsv -NoBench:$NoBench -Monitor:$Monitor
 
 if ($LASTEXITCODE -eq 0) {
     $csvAbs = Join-Path $projectRoot $ReportCsv

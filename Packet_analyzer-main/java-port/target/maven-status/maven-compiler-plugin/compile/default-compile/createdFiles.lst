@@ -14,14 +14,17 @@ com\deeppacket\pcap\PcapWriter.class
 com\deeppacket\engine\FastPathProcessor$1.class
 com\deeppacket\pcap\RawPacket.class
 com\deeppacket\engine\LiveCaptureService$CaptureStats.class
+com\deeppacket\monitoring\PrometheusMetricsServer.class
 com\deeppacket\dpi\SNIExtractor.class
 com\deeppacket\engine\ConnectionTracker$TrackerStats.class
 com\deeppacket\engine\FastPathProcessor.class
 com\deeppacket\model\AppType.class
+com\deeppacket\monitoring\PrometheusMetrics.class
 com\deeppacket\model\PacketAction.class
 com\deeppacket\model\PacketJob.class
 com\deeppacket\parser\PacketParser.class
 com\deeppacket\parser\ParsedPacket.class
+com\deeppacket\engine\DPIEngine$LatencyTracker.class
 com\deeppacket\engine\LoadBalancer$LBStats.class
 com\deeppacket\engine\RuleManager.class
 com\deeppacket\pcap\PcapPacketHeader.class
@@ -29,6 +32,7 @@ com\deeppacket\dpi\HTTPHostExtractor.class
 com\deeppacket\engine\LiveCaptureService.class
 com\deeppacket\engine\ThreadSafeQueue.class
 com\deeppacket\engine\FPManager.class
+com\deeppacket\monitoring\PrometheusMetricsServer$MetricsHandler.class
 com\deeppacket\engine\DPIEngine.class
 com\deeppacket\engine\LoadBalancer.class
 com\deeppacket\app\DpiMain.class
@@ -39,5 +43,6 @@ com\deeppacket\model\DPIStats.class
 com\deeppacket\dpi\DNSExtractor.class
 com\deeppacket\engine\GlobalConnectionTable$GlobalStats.class
 com\deeppacket\engine\RuleManager$BlockReason.class
+com\deeppacket\engine\DPIEngine$PerfSnapshot.class
 com\deeppacket\dpi\QUICSNIExtractor.class
 com\deeppacket\engine\LBManager.class
