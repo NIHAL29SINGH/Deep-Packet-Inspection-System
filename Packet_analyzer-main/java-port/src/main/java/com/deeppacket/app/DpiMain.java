@@ -46,7 +46,7 @@ public class DpiMain {
               %s ../test_dpi.pcap ../output.pcap --report-csv ../report.csv --report-json ../report.json
               %s ../test_dpi.pcap ../output.pcap --rules rules.txt --save-rules rules_out.txt
               %s ../test_dpi.pcap ../output.pcap --metrics-port 9400 --metrics-hold 30
-              %s --live ../output_live_filtered.pcap --iface Ethernet --duration 20 --capture-out ../live_input.pcap
+              %s --live ./outputs/output_live_filtered.pcap --iface en0 --duration 20 --capture-out ./outputs/live_input.pcap
             """.formatted(program, program, program, program, program, program, program, program, program));
     }
 
@@ -76,7 +76,7 @@ public class DpiMain {
         int optionStart;
         String iface = "";
         int durationSec = 15;
-        String captureOut = "../live_capture_input.pcap";
+        String captureOut = "./outputs/live_capture_input.pcap";
         String bpf = "ip and tcp or ip and udp";
         boolean metricsEnabled = true;
         String metricsBind = "0.0.0.0";
@@ -169,6 +169,7 @@ public class DpiMain {
                 System.out.println("[Live] Capture complete. Starting DPI processing...");
             } catch (Exception e) {
                 System.err.println("Live capture failed: " + e.getMessage());
+                System.err.println("Tip: On macOS/Linux, list interfaces with --list-ifaces and run live capture with required privileges (for example, sudo).");
                 System.exit(1);
             }
         }
