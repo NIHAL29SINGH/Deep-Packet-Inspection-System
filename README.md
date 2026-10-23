@@ -489,62 +489,144 @@ The key insight is that TLS metadata (especially ClientHello SNI) enables applic
 
 ---
 
-## 13. Recent Updates (Appended, Original Content Unchanged)
+## 13. Running on macOS/Linux and Windows
 
-The following updates were added to the Java project after the original document:
+### A) macOS/Linux quick start (fresh clone)
 
-- Command wrappers were simplified:
-  - `.\normal.cmd`
-  - `.\block.cmd <rules>`
-  - `.\live.cmd <duration>`
-- Metrics mode can be enabled directly from the same commands:
-  - `.\normal.cmd metrics`
-  - `.\block.cmd youtube,twitter metrics`
-  - `.\live.cmd 45 metrics`
-- Metrics mode behavior:
-  - Starts Prometheus/Grafana automatically (if not running)
-  - Opens Grafana dashboard directly
-  - Runs with `-NoBench` to avoid mixed benchmark output in metrics runs
-- Output organization:
-  - Generated artifacts are directed to `java-port/outputs/` (pcap/csv/json/prom metrics files)
-- Added/updated monitoring stack:
-  - Prometheus + Grafana Docker setup under `java-port/monitoring/`
-  - Provisioned Grafana dashboard for DPI metrics
-- Dashboard currently focuses on:
-  - Processing totals (packets/bytes/tcp/udp/forwarded/dropped)
-  - Performance metrics (pps/throughput/latency/cpu/memory)
-  - Thread statistics (LB/FP)
-  - Application breakdown
-  - Detected domains/SNIs
+```bash
+git clone https://github.com/NIHAL29SINGH/Deep-Packet-Inspection-System.git
+cd Deep-Packet-Inspection-System/Packet_analyzer-main/java-port
+chmod +x ./*.sh
+```
 
-### Quick Run Commands (Current)
+#### 1) Prerequisite checks (macOS-focused)
+
+```bash
+./setup-macos.sh
+./dpi.sh check
+```
+
+Expected tools:
+- Java 17+ (`java`)
+- Maven (`mvn`)
+- Python 3 (`python3`) for test PCAP generation
+- Docker Desktop (optional) for Prometheus/Grafana monitoring
+
+Homebrew install examples (manual, not auto-installed by scripts):
+
+```bash
+brew install openjdk@21 maven python
+```
+
+Apple Silicon note:
+- Homebrew is usually under `/opt/homebrew`.
+- If Java is not found after install, add:
+  - `export PATH="/opt/homebrew/opt/openjdk@21/bin:$PATH"`
+
+Intel Mac note:
+- Homebrew is usually under `/usr/local`.
+
+#### 2) Build
+
+```bash
+./build.sh
+# equivalent:
+./dpi.sh build
+```
+
+#### 3) Generate test PCAP data
+
+From repository root:
+
+```bash
+python3 Packet_analyzer-main/generate_test_pcap.py Packet_analyzer-main/generated_test.pcap
+```
+
+Or from `java-port`:
+
+```bash
+./dpi.sh generate ../generated_test.pcap
+```
+
+#### 4) Offline analysis (no root privileges required)
+
+```bash
+./normal.sh
+# or choose an explicit input file:
+./normal.sh ../quick_test_mixed_20mb.pcap --no-metrics --verbose
+```
+
+#### 5) Blocking + report examples
+
+```bash
+./block.sh youtube,twitter
+./block.sh --block-app YouTube --block-domain facebook --verbose
+./report.sh report ../quick_test_mixed_20mb.pcap
+```
+
+Outputs are written under `Packet_analyzer-main/java-port/outputs/`.
+
+#### 6) List interfaces first, then live capture
+
+```bash
+./ifaces.sh
+```
+
+Use the interface name shown by `ifaces.sh` (example only: `en0`):
+
+```bash
+sudo ./live.sh 20 en0
+```
+
+Notes:
+- Live capture may require elevated privileges on macOS/Linux.
+- Offline PCAP processing (`normal`, `block`, `report`) does **not** require elevated privileges.
+- If live capture fails, re-check interface names and permissions.
+
+#### 7) Optional Prometheus/Grafana monitoring (Docker Desktop)
+
+```bash
+./monitor.sh up
+./metrics.sh status
+./normal.sh metrics
+./monitor.sh down
+```
+
+URLs:
+- Grafana: `http://localhost:3001/d/dpi-engine-overview/dpi-live-metrics-report`
+- Prometheus: `http://localhost:9090`
+
+#### 8) Troubleshooting (macOS/Linux)
+
+- **Permission denied / no packets in live mode**
+  - Run live capture with `sudo`.
+  - Confirm interface name via `./ifaces.sh`.
+- **libpcap/native capture errors**
+  - macOS includes libpcap by default, but capture permissions still apply.
+  - Ensure terminal/app has permission to capture network traffic if required by your macOS security settings.
+- **Apple Silicon PATH/tooling mismatch**
+  - Ensure Homebrew-installed Java/Maven/Python are on `PATH`.
+- **Spaces in paths**
+  - Scripts use quoted absolute paths and support directories/files with spaces.
+
+### B) Windows commands (existing workflow retained)
 
 ```powershell
 cd "D:\deep packet\Packet_analyzer-main\java-port"
 .\build.cmd
-
 .\normal.cmd
-.\normal.cmd metrics
-
 .\block.cmd youtube,twitter
-.\block.cmd youtube,twitter metrics
-
+.\ifaces.cmd
 .\live.cmd 45
-.\live.cmd 45 metrics
-```
-
-### Monitoring Commands (Current)
-
-```powershell
-cd "D:\deep packet\Packet_analyzer-main\java-port"
 .\monitor.cmd up
-.\monitor.cmd status
-.\monitor.cmd restart
-.\monitor.cmd down
 ```
 
-Grafana:
-- `http://localhost:3001/d/dpi-engine-overview/dpi-live-metrics-report`
+### C) Build artifacts
 
-Prometheus:
-- `http://localhost:9090`
+Maven output under `Packet_analyzer-main/java-port/target/` is generated locally and no longer tracked in Git.
+Rebuild at any time with:
+
+```bash
+cd Packet_analyzer-main/java-port
+mvn clean package
+```
