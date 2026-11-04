@@ -1,4 +1,4 @@
-FROM maven:3.9-eclipse-temurin-17 AS build
+FROM maven:3.9-eclipse-temurin-26 AS build
 WORKDIR /workspace
 COPY Packet_analyzer-main/java-port/pom.xml Packet_analyzer-main/java-port/pom.xml
 RUN mvn -q -f Packet_analyzer-main/java-port/pom.xml dependency:go-offline
