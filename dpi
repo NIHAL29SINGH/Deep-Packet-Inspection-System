@@ -1,0 +1,235 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENGINE_DIR="$ROOT_DIR/Packet_analyzer-main/java-port"
+ENGINE="$ENGINE_DIR/dpi.sh"
+RISK_RULES="$ROOT_DIR/risk-rules.properties"
+
+if [[ ! -x "$ENGINE" ]]; then
+  echo "Error: engine launcher not found: $ENGINE" >&2
+  exit 1
+fi
+
+usage() {
+  cat <<'HELP'
+DPI Sentinel - plain-English commands
+
+  ./dpi setup                         Check that the computer is ready
+  ./dpi build                         Build the project
+  ./dpi demo                          Run the ready-made demonstration
+  ./dpi inspect                       Inspect the included packet capture
+  ./dpi report                       Make a complete traffic report
+  ./dpi replay                       Replay the sample through the engine
+  ./dpi evidence                     Make a shareable evidence folder
+  ./dpi benchmark                    Compare processing speeds
+  ./dpi block-app YouTube             Block an application
+  ./dpi block-site facebook.com       Block a website/domain
+  ./dpi block-address 192.168.1.10   Block an IP address
+  ./dpi create-test                   Create a test packet capture
+  ./dpi show-rules                    Show configurable risk rules
+  ./dpi test                          Run all automated tests
+  ./dpi smoke                         Run the quick health check
+  ./dpi start-monitoring              Start Prometheus/Grafana
+  ./dpi stop-monitoring               Stop Prometheus/Grafana
+  ./dpi monitoring-status             Check monitoring status
+  ./dpi docker-start                  Start the complete Docker setup
+  ./dpi docker-stop                   Stop the Docker setup
+  ./dpi docker-status                 Check Docker services
+  ./dpi clean                         Remove generated files
+  ./dpi help                          Show this help
+
+Examples:
+  ./dpi demo
+  ./dpi inspect
+  ./dpi report
+  ./dpi evidence
+  ./dpi block-app YouTube
+  ./dpi create-test
+  ./dpi test
+HELP
+}
+
+require_capture() {
+  local capture="${1:-}"
+  if [[ -z "$capture" || ! -f "$capture" ]]; then
+    echo "Error: PCAP file not found: ${capture:-<missing>}" >&2
+    exit 1
+  fi
+}
+
+absolute_capture() {
+  realpath "$1"
+}
+
+command="${1:-help}"
+shift || true
+
+case "$command" in
+  help|-h|--help)
+    usage
+    ;;
+  setup|check)
+    "$ENGINE" check
+    ;;
+  build)
+    "$ENGINE" build
+    ;;
+  demo)
+    "$ENGINE" report demo "$ENGINE_DIR/../sample_traffic.pcap" --no-metrics
+    echo
+    echo "Done. Open: $ENGINE_DIR/outputs/demo.html"
+    ;;
+  inspect|analyze|normal)
+    capture="${1:-$ENGINE_DIR/../sample_traffic.pcap}"
+    require_capture "$capture"
+    capture="$(absolute_capture "$capture")"
+    shift || true
+    extra=()
+    if [[ -f "$RISK_RULES" ]]; then extra+=(--risk-rules "$RISK_RULES"); fi
+    "$ENGINE" normal "$capture" --no-metrics "${extra[@]}" "$@"
+    ;;
+  make-report|report|replay)
+    if [[ "$command" == "replay" ]]; then
+      name="replay"
+      capture="${1:-$ENGINE_DIR/../sample_traffic.pcap}"
+    elif [[ "${1:-}" == *.pcap || "${1:-}" == *.pcapng ]]; then
+      name="report"
+      capture="$1"
+      shift
+    else
+      name="${1:-report}"
+      capture="${2:-$ENGINE_DIR/../sample_traffic.pcap}"
+    fi
+    require_capture "$capture"
+    extra=()
+    if [[ -f "$RISK_RULES" ]]; then extra+=(--risk-rules "$RISK_RULES"); fi
+    "$ENGINE" report "$name" "$(absolute_capture "$capture")" --no-metrics "${extra[@]}" "${@:3}"
+    echo
+    echo "Report folder: $ENGINE_DIR/outputs"
+    if [[ "$command" == "replay" ]]; then
+      echo "Replay complete: the capture was processed from start to finish with the current rules."
+    fi
+    ;;
+  make-evidence|investigate|evidence)
+    capture="${1:-$ENGINE_DIR/../sample_traffic.pcap}"
+    require_capture "$capture"
+    capture="$(absolute_capture "$capture")"
+    bundle="$ENGINE_DIR/outputs/investigation"
+    mkdir -p "$bundle"
+    extra=()
+    if [[ -f "$RISK_RULES" ]]; then extra+=(--risk-rules "$RISK_RULES"); fi
+    "$ENGINE" report investigation "$capture" --no-metrics "${extra[@]}"
+    {
+      echo "DPI Sentinel Evidence Bundle"
+      echo "generated_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      echo "source_capture=$(basename "$capture")"
+      echo "source_sha256=$(sha256sum "$capture" | awk '{print $1}')"
+      echo "engine_commit=$(git -C "$ROOT_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+      echo
+      echo "Artifacts:"
+      for file in "$ENGINE_DIR/outputs/investigation."{csv,json,html} "$ENGINE_DIR/outputs/output_investigation.pcap"; do
+        if [[ -f "$file" ]]; then
+          echo "$(basename "$file") sha256=$(sha256sum "$file" | awk '{print $1}')"
+        fi
+      done
+      echo
+      echo "Privacy: evidence IDs in JSON/HTML are stable SHA-256 correlation keys."
+      echo "Risk scores are explainable triage signals, not proof of compromise."
+    } > "$bundle/MANIFEST.txt"
+    cp "$ENGINE_DIR/outputs/investigation."{csv,json,html} "$bundle/"
+    cp "$ENGINE_DIR/outputs/output_investigation.pcap" "$bundle/"
+    echo
+    echo "Evidence bundle created: $bundle"
+    ;;
+  benchmark)
+    capture="${1:-$ENGINE_DIR/../sample_traffic.pcap}"
+    require_capture "$capture"
+    "$ENGINE_DIR/benchmark.sh" "$(absolute_capture "$capture")"
+    ;;
+  block-app|block-site|block-address|block)
+    if [[ "$command" != "block" ]]; then
+      kind="${command#block-}"
+      value="${1:-}"
+      capture="${2:-$ENGINE_DIR/../sample_traffic.pcap}"
+    else
+      kind="${1:-}"
+      value="${2:-}"
+      capture="${3:-$ENGINE_DIR/../sample_traffic.pcap}"
+    fi
+    case "$kind" in
+      app) flag="--block-app" ;;
+      site|domain) flag="--block-domain" ;;
+      address|ip) flag="--block-ip" ;;
+      *) echo "Use block-app, block-site, or block-address." >&2; exit 1 ;;
+    esac
+    if [[ -z "$value" ]]; then
+      echo "Tell me what to block. Example: ./dpi block-site example.com" >&2
+      exit 1
+    fi
+    require_capture "$capture"
+    capture="$(absolute_capture "$capture")"
+    extra=()
+    if [[ -f "$RISK_RULES" ]]; then extra+=(--risk-rules "$RISK_RULES"); fi
+    "$ENGINE" block "$capture" "$flag" "$value" --no-metrics "${extra[@]}"
+    ;;
+  monitor)
+    action="${1:-status}"
+    "$ENGINE" monitor "$action"
+    ;;
+  start-monitoring)
+    "$ENGINE" monitor up
+    ;;
+  stop-monitoring)
+    "$ENGINE" monitor down
+    ;;
+  monitoring-status)
+    "$ENGINE" monitor status
+    ;;
+  create-test|make-test)
+    "$ENGINE" generate "$ENGINE_DIR/outputs/test-dpi.pcap"
+    ;;
+  show-rules|rules)
+    if [[ -f "$RISK_RULES" ]]; then
+      cat "$RISK_RULES"
+    else
+      echo "Risk rules file not found: $RISK_RULES" >&2
+      exit 1
+    fi
+    ;;
+  test|tests)
+    (cd "$ENGINE_DIR" && mvn test)
+    ;;
+  verify)
+    (cd "$ENGINE_DIR" && mvn verify)
+    ;;
+  smoke|health-check)
+    (cd "$ENGINE_DIR" && ./smoke-test.sh)
+    ;;
+  docker-start)
+    command -v docker >/dev/null 2>&1 || { echo "Docker is not installed." >&2; exit 1; }
+    docker compose --profile dpi up --build -d
+    (cd "$ENGINE_DIR/monitoring" && docker compose up -d)
+    echo "Docker services started."
+    echo "Prometheus: http://localhost:9090"
+    echo "Grafana:    http://localhost:3001"
+    ;;
+  docker-stop)
+    docker compose --profile dpi down
+    (cd "$ENGINE_DIR/monitoring" && docker compose down)
+    ;;
+  docker-status)
+    docker compose --profile dpi ps
+    (cd "$ENGINE_DIR/monitoring" && docker compose ps)
+    ;;
+  clean)
+    rm -rf "$ENGINE_DIR/target" "$ENGINE_DIR/outputs"
+    echo "Build and output files removed."
+    ;;
+  *)
+    echo "Unknown command: $command"
+    echo
+    usage
+    exit 1
+    ;;
+esac

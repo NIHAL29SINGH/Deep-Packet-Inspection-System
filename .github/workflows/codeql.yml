@@ -1,0 +1,32 @@
+name: CodeQL
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '30 3 * * 1'
+
+permissions:
+  security-events: write
+  packages: read
+  actions: read
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze Java
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: java
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - run: mvn --batch-mode --no-transfer-progress -f Packet_analyzer-main/java-port/pom.xml compile
+      - name: Build Java project
+        run: mvn --batch-mode --no-transfer-progress -f Packet_analyzer-main/java-port/pom.xml -DskipTests package
+      - uses: github/codeql-action/analyze@v3

@@ -1,0 +1,6 @@
+# OS files
+.DS_Store
+
+# Java/Maven build outputs
+Packet_analyzer-main/java-port/target/
+Packet_analyzer-main/java-port/outputs/

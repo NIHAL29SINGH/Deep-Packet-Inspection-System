@@ -1,0 +1,23 @@
+services:
+  dpi:
+    build: .
+    profiles: ["dpi"]
+    ports:
+      - "9400:9400"
+    volumes:
+      - ./Packet_analyzer-main:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9400/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    # The metrics endpoint binds to loopback by default. Inside a container it must listen on all
+    # interfaces for the published port to work, e.g.:
+    #   docker compose run --service-ports dpi /data/sample_traffic.pcap /data/out.pcap --metrics-bind 0.0.0.0
+    command: ["--help"]
+
+  monitoring:
+    extends:
+      file: Packet_analyzer-main/java-port/monitoring/docker-compose.yml
+      service: prometheus
+    profiles: ["monitoring"]
