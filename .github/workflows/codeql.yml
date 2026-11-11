@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: github/codeql-action/init@v3
+      - uses: github/codeql-action/init@v4
         with:
           languages: java
       - uses: actions/setup-java@v4
@@ -29,4 +29,4 @@ jobs:
       - run: mvn --batch-mode --no-transfer-progress -f Packet_analyzer-main/java-port/pom.xml compile
       - name: Build Java project
         run: mvn --batch-mode --no-transfer-progress -f Packet_analyzer-main/java-port/pom.xml -DskipTests package
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@v4
